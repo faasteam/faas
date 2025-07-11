@@ -39,6 +39,10 @@ func init() {
 	faas.TimingFunc("{{ .TimingAnnotation.Type }}", "{{ .TimingAnnotation.Interval }}", {{ .Package }}.{{ .Name }})
 	{{- end }}
 }
+
+func main() {
+	faas.Run()
+}
 `
 
 type TemplateData struct {
