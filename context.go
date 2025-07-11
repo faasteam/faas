@@ -38,10 +38,10 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		}
 		if suffix := r.Header.Get("Faas-Path-Suffix"); suffix != "" {
 			c.RelPath, _ = url.QueryUnescape(suffix)
-			r.Header.Set("Faas-Path-Suffix", c.RelPath)
 		} else {
 			c.RelPath = r.URL.Path
 		}
+		r.Header.Set("Faas-Path-Suffix", c.RelPath)
 		c.oriPath = r.URL.Path
 	}
 	c.DataDir = os.Getenv("DATA_PATH")
