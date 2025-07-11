@@ -82,6 +82,7 @@ func generateCode(funclets []*Funclet, outputPath string) error {
 		if !ok {
 			data.Imports = append(data.Imports, "a"+strconv.Itoa(packagecnt)+" \""+f.ImportPath+"\"")
 			importMap[f.ImportPath] = packagecnt
+			index = packagecnt
 			packagecnt++
 		}
 		f.Package = "a" + strconv.Itoa(index)
