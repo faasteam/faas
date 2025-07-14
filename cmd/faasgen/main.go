@@ -12,7 +12,7 @@ import (
 func main() {
 	var allFunclets []*Funclet
 	var (
-		src    = flag.String("src", "server", "Source file or directory to scan for annotations.")
+		src    = flag.String("src", "", "Source file or directory to scan for annotations.")
 		output = flag.String("output", "main.go", "Output file name for generated faas code.")
 	)
 
@@ -28,6 +28,14 @@ func main() {
 		log.Fatalf("Could not find module path in go.mod")
 	}
 
+	if *src == "" {
+		fi, err := os.Stat("faas.go")
+		if err == nil && !fi.IsDir() {
+			*src = "faas.go"
+		} else {
+			*src = "server"
+		}
+	}
 	fileInfo, err := os.Stat(*src)
 	if err != nil {
 		log.Fatalf("Could not find file or directory: %s", *src)

@@ -66,7 +66,7 @@ func parseFile(filePath, modulePath string) ([]*Funclet, error) {
 						if f != nil {
 							f.Name = fn.Name.Name
 							dir := filepath.Dir(filePath)
-							if dir != "" {
+							if dir != "" && dir != "." {
 								f.ImportPath = filepath.Join(modulePath, dir)
 							}
 							funclets = append(funclets, f)
