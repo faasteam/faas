@@ -23,11 +23,17 @@ import (
 
 func init() {
 	{{- range .HTTPFunclets }}
-	{{- if eq .HTTPAnnotation.Entry "msg" }}
+	{{- if eq .HTTPAnnotation.FuncletType "onAuthFunclet" }}
+	faas.HandleAuth("{{ .HTTPAnnotation.Entry }}",  {{ .Package }}{{ .Name }})
+	{{- else if eq .HTTPAnnotation.FuncletType "onMessageFunclet" }}
 	faas.HandleFunc("{{ .HTTPAnnotation.Entry }}", "{{ .HTTPAnnotation.Type }}", "{{ .HTTPAnnotation.Path }}", faas.MessageHandler({{ .Package }}{{ .Name }}))
-    {{- else if eq .HTTPAnnotation.ParamCnt 2 }}
+	{{- else if eq .HTTPAnnotation.FuncletType "onGattFunclet" }}
+	faas.HandleFunc("{{ .HTTPAnnotation.Entry }}", "{{ .HTTPAnnotation.Type }}", "{{ .HTTPAnnotation.Path }}", faas.GattHandler({{ .Package }}{{ .Name }}, "{{ .HTTPAnnotation.ResPath }}"))
+	{{- else if eq .HTTPAnnotation.FuncletType "onStaticFunclet" }}
+	faas.HandleFunc("{{ .HTTPAnnotation.Entry }}", "{{ .HTTPAnnotation.Type }}", "{{ .HTTPAnnotation.Path }}", faas.StaticHandler({{ .Package }}{{ .Name }}, "{{ .HTTPAnnotation.ResPath }}"))
+	{{- else if and (eq .HTTPAnnotation.FuncletType "onHandleFunclet") (eq .HTTPAnnotation.ParamCnt 2) }}
 	faas.HandleFunc("{{ .HTTPAnnotation.Entry }}", "{{ .HTTPAnnotation.Type }}", "{{ .HTTPAnnotation.Path }}", {{ .Package }}{{ .Name }})
-    {{- else if eq .HTTPAnnotation.ParamCnt 3 }}
+	{{- else if and (eq .HTTPAnnotation.FuncletType "onHandleFunclet") (eq .HTTPAnnotation.ParamCnt 3) }}
 	faas.HandleFunc("{{ .HTTPAnnotation.Entry }}", "{{ .HTTPAnnotation.Type }}", "{{ .HTTPAnnotation.Path }}", faas.WithContextHandler({{ .Package }}{{ .Name }}))
     {{- end }}
 	{{- end }}

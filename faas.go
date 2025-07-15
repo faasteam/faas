@@ -15,21 +15,42 @@ type contextKeyType string
 
 const contextKey contextKeyType = "contextkey"
 
-var router = http.NewServeMux()
+type Entry struct {
+	name   string
+	auth   func(http.ResponseWriter, *http.Request, *Context)
+	router http.ServeMux
+}
 
-func makeContextMiddleware(next http.Handler) http.Handler {
+var entryMap map[string]*Entry = make(map[string]*Entry)
+
+func beforeDispatch() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		nc := newContext(w, r)
-		ctx := context.WithValue(r.Context(), contextKey, nc)
-		r.URL.Path = "/" + nc.Entry + nc.RelPath
-		next.ServeHTTP(w, r.WithContext(ctx))
+		c := newContext(w, r)
+		ctx := context.WithValue(r.Context(), contextKey, c)
+		r = r.WithContext(ctx)
+		entry, ok := entryMap[c.Entry]
+		if !ok {
+			http.Error(w, "Not Found", http.StatusNotFound)
+			return
+		}
+		if entry.auth != nil {
+			entry.auth(c.W, r, c)
+			if c.W.Status() != 0 {
+				return
+			}
+		}
+		entry.router.ServeHTTP(c.W, r)
+		if c.W.Status() == 0 {
+			http.Error(w, "Not Found", http.StatusNotFound)
+		}
 	})
 }
 
-func restorePathMiddleware(next http.Handler) http.Handler {
+func beforeHandle(next http.Handler, path string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if c, ok := r.Context().Value(contextKey).(*Context); ok {
 			r.URL.Path = c.oriPath
+			c.SubPath = c.RelPath[len(path):]
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -57,21 +78,36 @@ func Run() {
 		addr = ":8080"
 	}
 	log.Println("Server listening on :8080")
-	log.Fatal(http.ListenAndServe(addr, makeContextMiddleware(router)))
+	log.Fatal(http.ListenAndServe(addr, beforeDispatch()))
 }
 
-func HandleFunc(gateway, handlerType, path string, handler func(http.ResponseWriter, *http.Request)) {
-	log.Printf("Registering router gateway:%s type:%s path:%s\n", gateway, handlerType, path)
-	if gateway == "msg" {
-		router.HandleFunc(filepath.Join("/", gateway, handlerType, path), handler)
+func HandleAuth(entryName string, handler func(http.ResponseWriter, *http.Request, *Context)) {
+	log.Printf("Registering auth entryName:%s\n", entryName)
+	entry, ok := entryMap[entryName]
+	if !ok {
+		entry = &Entry{name: entryName}
+		entryMap[entryName] = entry
+	}
+	entry.auth = handler
+}
+
+func HandleFunc(entryName, handlerType, path string, handler func(http.ResponseWriter, *http.Request)) {
+	log.Printf("Registering router entryName:%s type:%s path:%s\n", entryName, handlerType, path)
+	entry, ok := entryMap[entryName]
+	if !ok {
+		entry = &Entry{name: entryName}
+		entryMap[entryName] = entry
+	}
+	if entryName == "msg" {
+		entry.router.HandleFunc(filepath.Join(handlerType, path), handler)
 	} else {
 		if handlerType == "path" {
-			router.Handle("/"+gateway+path, restorePathMiddleware(http.HandlerFunc(handler)))
+			entry.router.Handle(path, beforeHandle(http.HandlerFunc(handler), path))
 		} else if handlerType == "prefix" {
 			if !strings.HasSuffix(path, "/") {
 				path = path + "/"
 			}
-			router.Handle("/"+gateway+path, restorePathMiddleware(http.HandlerFunc(handler)))
+			entry.router.Handle(path, beforeHandle(http.HandlerFunc(handler), path))
 		}
 	}
 }

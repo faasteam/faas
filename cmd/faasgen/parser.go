@@ -18,11 +18,12 @@ const (
 )
 
 type HTTPAnnotation struct {
-	Entry    string // "api" or "local"
-	Type     string // "path" or "prefix"
-	Path     string
-	ParamCnt int    // 2 or 3
-	Method   string // Default to GET for now, can be extended
+	FuncletType string // onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattFunclet|onStaticFunclet
+	Entry       string // "api" or "local"
+	Type        string // "path" or "prefix"
+	Path        string
+	ResPath     string
+	ParamCnt    int
 }
 
 type TimingAnnotation struct {
@@ -40,7 +41,7 @@ type Funclet struct {
 type MatchAnnotation func(fn *ast.FuncDecl, text string) (*Funclet, error)
 
 var (
-	httpRegex   = regexp.MustCompile(`^//\s*@(onHandleFunclet|onMessageFunclet)\s+(\w+)\s*\(\s*(\w+)\s*,\s*([^)]*)\s*\)`)
+	httpRegex   = regexp.MustCompile(`^//\s*@(onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattFunclet|onStaticFunclet)\s+(\w+)\s*\((.*?)\)`)
 	timingRegex = regexp.MustCompile(`^//\s*@onTimingFunclet\s+time\s*\(\s*(repeat|everyday|once)\s*(?:,\s*([^)]+)\s*)?\)`)
 	matchSlice  = []MatchAnnotation{matchHTTPAnnotation, matchTimingAnnotation}
 )
@@ -80,35 +81,79 @@ func parseFile(filePath, modulePath string) ([]*Funclet, error) {
 	return funclets, nil
 }
 
+func parseParam(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	arr := strings.Split(s, ",")
+	for i, v := range arr {
+		arr[i] = strings.TrimSpace(v)
+	}
+	return arr
+}
 func matchHTTPAnnotation(fn *ast.FuncDecl, text string) (*Funclet, error) {
 	matches := httpRegex.FindStringSubmatch(text)
-	if len(matches) != 5 {
+	if len(matches) != 4 {
 		return nil, nil
 	}
 	cnt := len(fn.Type.Params.List)
-	if matches[1] == "onMessageFunclet" && cnt != 1 {
-		return nil, errors.New("onMessageFunclet param err, not eq 1")
-	} else if matches[1] == "onHandleFunclet" && cnt != 2 && cnt != 3 {
-		return nil, errors.New("onHandleFunclet param err, not eq 2 or 3")
+	param := parseParam(matches[3])
+	httpAnnot := &HTTPAnnotation{
+		FuncletType: matches[1],
+		Entry:       matches[2],
+		ParamCnt:    cnt,
+	}
+	if matches[1] == "onAuthFunclet" {
+		if len(param) != 0 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 3 {
+			return nil, errors.New("bad function param")
+		}
+	} else if matches[1] == "onMessageFunclet" {
+		if len(param) != 2 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 1 {
+			return nil, errors.New("bad function param")
+		}
+		httpAnnot.Type = param[0]
+		httpAnnot.Path = param[1]
+	} else if matches[1] == "onHandleFunclet" {
+		if len(param) != 2 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 2 && cnt != 3 {
+			return nil, errors.New("bad function param")
+		}
+		if param[0] != "path" && param[0] != "prefix" {
+			return nil, errors.New("Error type " + httpAnnot.Type + ",only support path/prefix")
+		}
+		httpAnnot.Type = param[0]
+		httpAnnot.Path = param[1]
+	} else if matches[1] == "onGattFunclet" || matches[1] == "onStaticFunclet" {
+		if len(param) != 3 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 3 {
+			return nil, errors.New("bad function param")
+		}
+		if param[0] != "path" && param[0] != "prefix" {
+			return nil, errors.New("Error type " + httpAnnot.Type + ",only support path/prefix")
+		}
+		httpAnnot.Type = param[0]
+		httpAnnot.Path = param[1]
+		httpAnnot.ResPath = param[2]
 	}
 
-	path := matches[4]
-	if path == "" || path == "*" {
-		path = "/"
+	if httpAnnot.Path == "" || httpAnnot.Path == "*" {
+		httpAnnot.Path = "/"
 	} else {
-		path = strings.TrimRight(path, "/")
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
+		httpAnnot.Path = strings.TrimRight(httpAnnot.Path, "/")
+		if !strings.HasPrefix(httpAnnot.Path, "/") {
+			httpAnnot.Path = "/" + httpAnnot.Path
 		}
-	}
-	httpAnnot := &HTTPAnnotation{
-		Entry:    matches[2],
-		Type:     matches[3],
-		Path:     path,
-		ParamCnt: cnt,
-	}
-	if httpAnnot.Entry != "msg" && httpAnnot.Type != "path" && httpAnnot.Type != "prefix" {
-		return nil, errors.New("Error http type " + httpAnnot.Type)
 	}
 	return &Funclet{HTTPAnnotation: httpAnnot}, nil
 }

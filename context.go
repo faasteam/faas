@@ -7,8 +7,6 @@ import (
 )
 
 type Context struct {
-	W http.ResponseWriter
-	R *http.Request
 	//沙箱注解开始的路径
 	RelPath string
 	//沙箱数据目录
@@ -21,17 +19,24 @@ type Context struct {
 	IscUrl string
 	//内部访问gogs/gitea的路径前缀
 	GitUrl string
+	/*******************以下内容全局变量FAAS上不存在**************************/
+	W ResponseWriter
+	R *http.Request
 	//入口名称
 	Entry string
+	//gatt 函数名
+	Fn string
+	//前缀模式匹配下可用
+	SubPath string
 	//原始请求路径
 	oriPath string
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	c := new(Context)
-	c.W = w
-	c.R = r
 	if r != nil {
+		c.W = NewResponse(w)
+		c.R = r
 		c.Entry = r.Header.Get("Faas-Gateway-Name")
 		if c.Entry == "" {
 			c.Entry = "api"
@@ -43,6 +48,7 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		}
 		r.Header.Set("Faas-Path-Suffix", c.RelPath)
 		c.oriPath = r.URL.Path
+		r.URL.Path = c.RelPath
 	}
 	c.DataDir = os.Getenv("DATA_PATH")
 	c.WorkDir = os.Getenv("PROGRAM_PATH")
