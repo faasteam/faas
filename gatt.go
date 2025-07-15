@@ -26,9 +26,6 @@ func GattHandler(handler func(http.ResponseWriter, *http.Request, *Context), res
 		log.Printf("GattHandler relPath: %v,subPath: %v, r.URL.RawQuery: %v", c.RelPath, c.SubPath, r.URL.RawQuery)
 		path := c.SubPath
 		if path == "" {
-			path = "/"
-		}
-		if path == "/" {
 			w.Header().Set("Content-Type", "application/json")
 			if treeCacheErr != nil {
 				http.Error(w, treeCacheErr.Error(), http.StatusInternalServerError)
