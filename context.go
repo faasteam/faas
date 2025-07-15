@@ -7,8 +7,6 @@ import (
 )
 
 type Context struct {
-	//沙箱注解开始的路径
-	RelPath string
 	//沙箱数据目录
 	DataDir string
 	//代码检出的工作目录
@@ -20,23 +18,27 @@ type Context struct {
 	//内部访问gogs/gitea的路径前缀
 	GitUrl string
 	/*******************以下内容全局变量FAAS上不存在**************************/
-	W ResponseWriter
-	R *http.Request
+	w ResponseWriter
+	r *http.Request
+	//原始请求路径
+	oriPath string
+	//沙箱注解开始的路径
+	RelPath string
+	//前缀模式匹配下可用
+	SubPath string
 	//入口名称
 	Entry string
 	//gatt 函数名
 	Fn string
-	//前缀模式匹配下可用
-	SubPath string
-	//原始请求路径
-	oriPath string
+	//auth 鉴权过后设置的内容
+	Ctx any
 }
 
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	c := new(Context)
 	if r != nil {
-		c.W = NewResponse(w)
-		c.R = r
+		c.w = NewResponse(w)
+		c.r = r
 		c.Entry = r.Header.Get("Faas-Gateway-Name")
 		if c.Entry == "" {
 			c.Entry = "api"

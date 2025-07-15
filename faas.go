@@ -34,13 +34,13 @@ func beforeDispatch() http.Handler {
 			return
 		}
 		if entry.auth != nil {
-			entry.auth(c.W, r, c)
-			if c.W.Status() != 0 {
+			entry.auth(c.w, r, c)
+			if c.w.Status() != 0 {
 				return
 			}
 		}
-		entry.router.ServeHTTP(c.W, r)
-		if c.W.Status() == 0 {
+		entry.router.ServeHTTP(c.w, r)
+		if c.w.Status() == 0 {
 			http.Error(w, "Not Found", http.StatusNotFound)
 		}
 	})
