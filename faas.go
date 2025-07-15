@@ -77,7 +77,7 @@ func Run() {
 	if addr == "" {
 		addr = ":8080"
 	}
-	log.Println("Server listening on :8080")
+	log.Println("Server listening on ", addr)
 	log.Fatal(http.ListenAndServe(addr, beforeDispatch()))
 }
 
@@ -107,7 +107,7 @@ func HandleFunc(entryName, handlerType, path string, handler func(http.ResponseW
 			if !strings.HasSuffix(path, "/") {
 				path = path + "/"
 			}
-			entry.router.Handle(path, beforeHandle(http.HandlerFunc(handler), path))
+			entry.router.Handle(path, beforeHandle(http.HandlerFunc(handler), strings.TrimSuffix(path, "/")))
 		}
 	}
 }

@@ -89,9 +89,9 @@ func buildDirectoryTree(dir string) ([]map[string]any, error) {
 }
 
 func serveStatic(w http.ResponseWriter, r *http.Request, c *Context, rootPath string, handler404 func(http.ResponseWriter, *http.Request, *Context)) {
-	filePath := filepath.Join(rootPath, c.SubPath)
+	filePath := rootPath + c.SubPath
 	if strings.HasSuffix(filePath, "/") {
-		filePath += "/index.html"
+		filePath += "index.html"
 	}
 	info, err := os.Stat(filePath)
 	if err != nil || info.IsDir() {
