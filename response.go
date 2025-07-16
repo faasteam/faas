@@ -1,6 +1,8 @@
 package faas
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 )
 
@@ -48,4 +50,24 @@ func (rw *Response) Status() int {
 
 func (rw *Response) Size() int {
 	return rw.written
+}
+
+func (rw *Response) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (rw *Response) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := rw.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, http.ErrHijacked
+}
+
+func (rw *Response) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := rw.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
