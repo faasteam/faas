@@ -50,7 +50,6 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 		}
 		r.Header.Set("Faas-Path-Suffix", c.RelPath)
 		c.oriPath = r.URL.Path
-		r.URL.Path = c.RelPath
 	}
 	c.DataDir = os.Getenv("DATA_PATH")
 	c.WorkDir = os.Getenv("PROGRAM_PATH")

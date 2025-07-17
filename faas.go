@@ -39,6 +39,7 @@ func beforeDispatch() http.Handler {
 				return
 			}
 		}
+		r.URL.Path = c.RelPath
 		entry.router.ServeHTTP(c.w, r)
 		if c.w.Status() == 0 {
 			http.Error(w, "Not Found", http.StatusNotFound)
