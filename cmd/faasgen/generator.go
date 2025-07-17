@@ -93,7 +93,7 @@ func generateCode(funclets []*Funclet, outputPath string) error {
 		}
 		if f.HTTPAnnotation != nil {
 			key := f.HTTPAnnotation.Entry + f.HTTPAnnotation.Path
-			if f.HTTPAnnotation.Type == "prefix" && pathMap[key] == "" {
+			if f.HTTPAnnotation.Type == "prefix" && pathMap[key] == "" && f.HTTPAnnotation.Path != "/" {
 				f2 := *f
 				f2.HTTPAnnotation = new(HTTPAnnotation)
 				*f2.HTTPAnnotation = *f.HTTPAnnotation
