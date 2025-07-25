@@ -81,6 +81,11 @@ func buildDirectoryTree(dir string) ([]map[string]any, error) {
 					return nil, err
 				}
 				item["content"] = data
+				if attmap, ok := data.(map[string]any); ok {
+					if v, ok := attmap["@refer"].(string); ok && v != "" {
+						item["url"] = v
+					}
+				}
 			}
 		}
 		tree = append(tree, item)
