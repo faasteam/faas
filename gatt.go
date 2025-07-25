@@ -107,4 +107,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request, c *Context, rootPath st
 		}
 		http.ServeFile(w, r, filePath)
 	}
+	if c.w.Status() == 0 {
+		http.Error(w, "Not Found", http.StatusNotFound)
+	}
 }
