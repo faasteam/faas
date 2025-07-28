@@ -38,6 +38,14 @@ func init() {
     {{- end }}
 	{{- end }}
 
+	{{- if .GattEntry }}
+	faas.GattEntry("{{ .GattEntry.HTTPAnnotation.Entry }}", "{{ .GattEntry.HTTPAnnotation.Path }}", {{ .GattEntry.Package }}{{ .GattEntry.Name }}, "{{ .GattEntry.HTTPAnnotation.ResPath }}")
+	{{- end }}
+
+	{{- range .GattFunclets }}
+	faas.RegisterGattFnHandler("{{ .HTTPAnnotation.Path }}", {{ .Package }}{{ .Name }})
+	{{- end }}
+
 	{{- range .TimingFunclets }}
 	faas.TimingFunc("{{ .TimingAnnotation.Type }}", "{{ .TimingAnnotation.Interval }}", {{ .Package }}{{ .Name }})
 	{{- end }}
@@ -50,6 +58,8 @@ func main() {
 
 type TemplateData struct {
 	HTTPFunclets   []*Funclet
+	GattEntry      *Funclet
+	GattFunclets   []*Funclet
 	TimingFunclets []*Funclet
 	Imports        []string
 }
@@ -92,21 +102,36 @@ func generateCode(funclets []*Funclet, outputPath string) error {
 			f.Package = "a" + strconv.Itoa(index) + "."
 		}
 		if f.HTTPAnnotation != nil {
-			key := f.HTTPAnnotation.Entry + f.HTTPAnnotation.Path
-			if f.HTTPAnnotation.Type == "prefix" && pathMap[key] == "" && f.HTTPAnnotation.Path != "/" {
-				f2 := *f
-				f2.HTTPAnnotation = new(HTTPAnnotation)
-				*f2.HTTPAnnotation = *f.HTTPAnnotation
-				f2.HTTPAnnotation.Type = "path"
-				data.HTTPFunclets = append(data.HTTPFunclets, &f2)
+			if f.HTTPAnnotation.FuncletType == "onGattEntry" {
+				if data.GattEntry != nil {
+					return errors.New("GattEntry can only be defined once")
+				}
+				data.GattEntry = f
+			} else if f.HTTPAnnotation.FuncletType == "onGattFunclet" {
+				data.GattFunclets = append(data.GattFunclets, f)
+			} else {
+				key := f.HTTPAnnotation.Entry + f.HTTPAnnotation.Path
+				if f.HTTPAnnotation.Type == "prefix" && pathMap[key] == "" && f.HTTPAnnotation.Path != "/" {
+					f2 := *f
+					f2.HTTPAnnotation = new(HTTPAnnotation)
+					*f2.HTTPAnnotation = *f.HTTPAnnotation
+					f2.HTTPAnnotation.Type = "path"
+					data.HTTPFunclets = append(data.HTTPFunclets, &f2)
+				}
+				data.HTTPFunclets = append(data.HTTPFunclets, f)
 			}
-			data.HTTPFunclets = append(data.HTTPFunclets, f)
 		} else if f.TimingAnnotation != nil {
 			data.TimingFunclets = append(data.TimingFunclets, f)
 		}
 	}
 	sort.Slice(data.HTTPFunclets, func(i, j int) bool {
 		return data.HTTPFunclets[i].HTTPAnnotation.Path < data.HTTPFunclets[j].HTTPAnnotation.Path
+	})
+	if data.GattEntry == nil && len(data.GattFunclets) != 0 {
+		return fmt.Errorf("not found GattEntry")
+	}
+	sort.Slice(data.GattFunclets, func(i, j int) bool {
+		return data.GattFunclets[i].HTTPAnnotation.Path < data.GattFunclets[j].HTTPAnnotation.Path
 	})
 	tmpl, err := template.New("faasgen").Parse(generatedFileTemplate)
 	if err != nil {

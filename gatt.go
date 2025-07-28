@@ -9,10 +9,18 @@ import (
 	"strings"
 )
 
-func GattHandler(handler func(http.ResponseWriter, *http.Request, *Context), resDir string) http.HandlerFunc {
+var gattHandlerMap map[string]func(http.ResponseWriter, *http.Request, *Context)
+
+func GattEntry(entryName, gattPath string, handler func(http.ResponseWriter, *http.Request, *Context), resDir string) {
 	var directoryTreeCache []byte
 	var treeCacheErr error
-	// 只加载并编码一次目录树
+	log.Printf("Registering GattEntry path: %s\n", gattPath)
+
+	if gattHandlerMap != nil {
+		panic("GattEntry can only be called once")
+	}
+	gattHandlerMap = make(map[string]func(http.ResponseWriter, *http.Request, *Context))
+
 	absPath := filepath.Join(FAAS.WorkDir, resDir)
 	tree, err := buildDirectoryTree(absPath)
 	if err != nil {
@@ -21,7 +29,7 @@ func GattHandler(handler func(http.ResponseWriter, *http.Request, *Context), res
 		directoryTreeCache, treeCacheErr = json.Marshal(tree)
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	wrapHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, _ := r.Context().Value(contextKey).(*Context)
 		log.Printf("GattHandler relPath: %v,subPath: %v, r.URL.RawQuery: %v", c.RelPath, c.SubPath, r.URL.RawQuery)
 		path := c.SubPath
@@ -34,12 +42,31 @@ func GattHandler(handler func(http.ResponseWriter, *http.Request, *Context), res
 			w.Write(directoryTreeCache)
 		} else if f := r.URL.Query().Get("fn"); f != "" && strings.HasSuffix(path, ".att") {
 			w.Header().Set("Content-Type", "application/json")
-			c.Fn = filepath.Base(path) + "@" + f
-			handler(w, r, c)
+			c.Fn = strings.TrimPrefix(path, "/") + "@" + f
+			if h, ok := gattHandlerMap[c.Fn]; ok {
+				h(w, r, c)
+			} else if h, ok := gattHandlerMap["*"]; ok {
+				h(w, r, c)
+			} else {
+				http.Error(w, "Not Found", http.StatusNotFound)
+			}
 		} else {
 			serveStatic(w, r, c, absPath, handler)
 		}
 	})
+	HandleFunc(entryName, "path", gattPath, wrapHandler)
+	HandleFunc(entryName, "prefix", gattPath, wrapHandler)
+}
+
+func RegisterGattFnHandler(fn string, handler func(http.ResponseWriter, *http.Request, *Context)) {
+	log.Printf("Registering gatt fn: %s\n", fn)
+	if gattHandlerMap == nil {
+		panic("Before registering an GattFnHandler, you must first call GattEntry")
+	}
+	if _, ok := gattHandlerMap[fn]; ok {
+		panic(fn + " has already been registered.")
+	}
+	gattHandlerMap[fn] = handler
 }
 
 func StaticHandler(handler func(http.ResponseWriter, *http.Request, *Context), resDir string) http.HandlerFunc {

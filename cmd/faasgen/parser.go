@@ -18,7 +18,7 @@ const (
 )
 
 type HTTPAnnotation struct {
-	FuncletType string // onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattFunclet|onStaticFunclet
+	FuncletType string // onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattEntry|onGattFunclet|onStaticFunclet
 	Entry       string // "api" or "local"
 	Type        string // "path" or "prefix"
 	Path        string
@@ -41,7 +41,7 @@ type Funclet struct {
 type MatchAnnotation func(fn *ast.FuncDecl, text string) (*Funclet, error)
 
 var (
-	httpRegex   = regexp.MustCompile(`^//\s*@(onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattFunclet|onStaticFunclet)\s+(\w+)\s*\((.*?)\)`)
+	httpRegex   = regexp.MustCompile(`^//\s*@(onHandleFunclet|onMessageFunclet|onAuthFunclet|onGattEntry|onGattFunclet|onStaticFunclet)\s+(\w+)\s*\((.*?)\)`)
 	timingRegex = regexp.MustCompile(`^//\s*@onTimingFunclet\s+time\s*\(\s*(repeat|everyday|once)\s*(?:,\s*([^)]+)\s*)?\)`)
 	matchSlice  = []MatchAnnotation{matchHTTPAnnotation, matchTimingAnnotation}
 )
@@ -132,7 +132,25 @@ func matchHTTPAnnotation(fn *ast.FuncDecl, text string) (*Funclet, error) {
 		}
 		httpAnnot.Type = param[0]
 		httpAnnot.Path = param[1]
-	} else if matches[1] == "onGattFunclet" || matches[1] == "onStaticFunclet" {
+	} else if matches[1] == "onGattEntry" {
+		if len(param) != 2 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 3 {
+			return nil, errors.New("bad function param")
+		}
+		httpAnnot.Type = "prefix"
+		httpAnnot.Path = param[0]
+		httpAnnot.ResPath = param[1]
+	} else if matches[1] == "onGattFunclet" {
+		if len(param) != 1 {
+			return nil, errors.New("bad Annotation")
+		}
+		if cnt != 3 {
+			return nil, errors.New("bad function param")
+		}
+		httpAnnot.Path = param[0]
+	} else if matches[1] == "onStaticFunclet" {
 		if len(param) != 3 {
 			return nil, errors.New("bad Annotation")
 		}
@@ -146,15 +164,22 @@ func matchHTTPAnnotation(fn *ast.FuncDecl, text string) (*Funclet, error) {
 		httpAnnot.Path = param[1]
 		httpAnnot.ResPath = param[2]
 	}
-
-	if httpAnnot.Path == "" || httpAnnot.Path == "*" {
-		httpAnnot.Path = "/"
+	if httpAnnot.FuncletType == "onGattFunclet" {
+		httpAnnot.Path = strings.TrimPrefix(httpAnnot.Path, "/")
+		if httpAnnot.Path == "" {
+			httpAnnot.Path = "*"
+		}
 	} else {
-		httpAnnot.Path = strings.TrimRight(httpAnnot.Path, "/")
-		if !strings.HasPrefix(httpAnnot.Path, "/") {
-			httpAnnot.Path = "/" + httpAnnot.Path
+		if httpAnnot.Path == "" || httpAnnot.Path == "*" {
+			httpAnnot.Path = "/"
+		} else {
+			httpAnnot.Path = strings.TrimRight(httpAnnot.Path, "/")
+			if !strings.HasPrefix(httpAnnot.Path, "/") {
+				httpAnnot.Path = "/" + httpAnnot.Path
+			}
 		}
 	}
+
 	return &Funclet{HTTPAnnotation: httpAnnot}, nil
 }
 
